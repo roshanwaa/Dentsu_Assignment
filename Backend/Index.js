@@ -1,82 +1,99 @@
-const express = new require('express');
+const express = require('express');
 const cors = require('cors');
-const { mongoose } = require('mongoose');
-const User = require('./Models/User.js');
-const bcrypt = require('bcrypt');
-const cookieParser = require('cookie-parser');
-
-require('dotenv').config();
+const mongoose = new require('mongoose');
+const User = require('./Models/User');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
+require('dotenv').config();
+
+const bcryptSalt = bcrypt.genSaltSync(10);
+const jwtSecret = 'eyJhbGciOiJIUzI1Nioj9HXhilse9gHKMs9If4hhM8u4Bvg';
 
 const app = express();
-const port = 4000;
 
-const secretToken = process.env.SECRET_TOKEN;
-
-const salt = bcrypt.genSaltSync(10);
-app.use(cors({ credentials: true, origin: 'http://localhost:5173' }));
 app.use(express.json());
 app.use(cookieParser());
 
-mongoose.Promise = global.Promise;
+app.use(
+  cors({
+    credentials: true,
+    origin: 'http://127.0.0.1:5173',
+  })
+);
+
+console.log(process.env.MONGO_URL);
+mongoose.set('strictQuery', false);
+// mongoose.connect(process.env.MONGO_URL);
+
 mongoose.connect(
   'mongodb+srv://kumroshan120:zRpJp2fPlqR9SNqO@dentsuassignment.d3pog7s.mongodb.net/?retryWrites=true&w=majority',
   { useNewUrlParser: true, useUnifiedTopology: true }
 );
 
-app.get('/', function (req, res) {
-  res.json('Hello Test! Im Roshan.waa is a blog website');
+app.get('/test', (req, res) => {
+  res.json({ msg: 'This is CORS-enabled for all origins!' });
 });
 
 app.post('/register', async (req, res) => {
-  const { userName, userEmail, userPassword } = req.body;
+  const { name, email, password } = req.body;
+
   try {
     const userDoc = await User.create({
-      userName,
-      userEmail,
-      userPassword: bcrypt.hashSync(userPassword, salt),
+      name,
+      email,
+      password: bcrypt.hashSync(password, bcryptSalt),
     });
     res.json(userDoc);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
+  } catch (e) {
+    res.status(422).json(e);
   }
 });
 
 app.post('/login', async (req, res) => {
-  const { userEmail, userPassword } = req.body;
+  const { email, password } = req.body;
 
-  const userDoc = await User.findOne({ userEmail });
-  const passOk = bcrypt.compareSync(userPassword, userDoc.userPassword);
-
-  if (passOk) {
-    jwt.sign(
-      { userEmail, id: userDoc._id },
-      secretToken,
-      {},
-      (err, resToken) => {
-        if (err) throw err;
-        res.cookie('token', resToken).json({
+  const userDoc = await User.findOne({ email });
+  if (userDoc) {
+    const passOk = bcrypt.compareSync(password, userDoc.password);
+    if (passOk) {
+      jwt.sign(
+        {
+          email: userDoc.email,
           id: userDoc._id,
-          userEmail,
-        });
-      }
-    );
+        },
+        jwtSecret,
+        {},
+        (err, token) => {
+          if (err) throw err;
+          res.cookie('token', token).json(userDoc);
+        }
+      );
+    } else {
+      res.status(422).json('pass not ok');
+    }
   } else {
-    res.status(400).json('Wrong password!');
+    res.json('User not found');
   }
 });
 
 app.get('/profile', (req, res) => {
   const { token } = req.cookies;
-
-  jwt.verify(token, secretToken, {}, (err, info) => {
-    if (err) throw err;
-    res.json(info);
-  });
+  if (token) {
+    jwt.verify(token, jwtSecret, {}, async (err, userData) => {
+      if (err) throw err;
+      const { name, email, _id } = await User.findById(userData.id);
+      res.json({ name, email, _id });
+    });
+  } else {
+    res.json(null);
+  }
 });
 
-app.post('/signOut', (req, res) => {
-  res.cookie('token', '').json('Ok');
+app.post('/logout', (req, res) => {
+  res.cookie('token', '').json(true);
 });
 
-app.listen(port);
+app.listen(4000, function () {
+  console.log(`CORS-enabled web server listening on port 4000`);
+});

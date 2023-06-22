@@ -1,34 +1,42 @@
+import axios from 'axios';
 import React, { useContext, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { UserContext } from './UserContext';
+import { UserCreateContext } from '../Pages/UserCreateContext';
+
 export const Login = () => {
-  // const [userName, setUserName] = useState('');
-  const [userEmail, setUserEmail] = useState('');
-  const [userPassword, setUserPassword] = useState('');
-  const [redirectUrl, setRedirectUrl] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [redirectHomePage, setRedirectHomePage] = useState(false);
 
-  const { setUserInfo } = useContext(UserContext);
+  const { setUser } = useContext(UserCreateContext);
+  const loginSubmitHandler = async (event) => {
+    event.preventDefault();
 
-  async function userLogin(ev) {
-    ev.preventDefault();
-
-    const response = await fetch('http://localhost:4000/login', {
-      method: 'POST',
-      body: JSON.stringify({ userEmail, userPassword }),
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-    });
-    if (response.ok) {
-      response.json().then((usrInfo) => {
-        setUserInfo(usrInfo);
-        setRedirectUrl(true);
+    try {
+      const { data } = await axios.post('/login', {
+        email,
+        password,
       });
-    } else {
-      alert('Login Failed');
-    }
-  }
 
-  if (redirectUrl) {
+      setUser(data);
+      console.log('Login Successful');
+      setRedirectHomePage(true);
+    } catch (e) {
+      console.log(e + ' Login Failed');
+    }
+
+    setEmail('');
+    setPassword('');
+  };
+
+  const emailChangeHandler = (value) => {
+    setEmail(value.target.value);
+  };
+  const passwordChangeHandler = (value) => {
+    setPassword(value.target.value);
+  };
+
+  if (redirectHomePage) {
     return <Navigate to={'/'} />;
   }
 
@@ -38,22 +46,22 @@ export const Login = () => {
         <div className="left_Container" />
         <div className="right_Container">
           <div className="signIn-content">
-            <form action="" className="signIn" onSubmit={userLogin}>
+            <form action="" className="signIn" onSubmit={loginSubmitHandler}>
               <input
                 type="text"
                 name="name"
                 id="name"
                 placeholder="Username"
-                value={userEmail}
-                onChange={(ev) => setUserEmail(ev.target.value)}
+                value={email}
+                onChange={emailChangeHandler}
               />
               <input
                 type="password"
                 name="password"
                 id="password"
                 placeholder="Password"
-                value={userPassword}
-                onChange={(ev) => setUserPassword(ev.target.value)}
+                value={password}
+                onChange={passwordChangeHandler}
               />
               <button type="submit" className="registerButton">
                 Login
